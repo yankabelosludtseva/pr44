@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 using System.Windows;
 using LibraryCatalog.Classes;
+using LibraryCatalog.Context;
 using LibraryCatalog.ViewModels;
 using Microsoft.EntityFrameworkCore;
 using Schema = System.ComponentModel.DataAnnotations.Schema;
@@ -13,6 +14,13 @@ namespace LibraryCatalog.Models
     {
         [Key]
         public int Id { get; set; }
+
+        [Schema.NotMapped]
+        public LibraryContext Context { get; set; }
+
+        [Schema.NotMapped]
+        public VM_Books ViewModel { get; set; }
+
         private string title;
         public string Title
         {
@@ -26,6 +34,7 @@ namespace LibraryCatalog.Models
                 else { title = value; OnPropertyChanged(); }
             }
         }
+
         private string author;
         public string Author
         {
@@ -38,6 +47,7 @@ namespace LibraryCatalog.Models
                 else { author = value; OnPropertyChanged(); }
             }
         }
+
         private int year;
         public int Year
         {
@@ -49,6 +59,7 @@ namespace LibraryCatalog.Models
                 else { year = value; OnPropertyChanged(); }
             }
         }
+
         private string genre;
         public string Genre
         {
@@ -61,6 +72,7 @@ namespace LibraryCatalog.Models
                 else { genre = value; OnPropertyChanged(); }
             }
         }
+
         private string description;
         public string Description
         {
@@ -73,6 +85,7 @@ namespace LibraryCatalog.Models
                 else { description = value; OnPropertyChanged(); }
             }
         }
+
         private bool isAvailable;
         public bool IsAvailable
         {
@@ -87,46 +100,93 @@ namespace LibraryCatalog.Models
             get => isEditMode;
             set { isEditMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(EditButtonText)); }
         }
+
         [Schema.NotMapped]
         public string EditButtonText => IsEditMode ? "Сохранить" : "Изменить";
 
         [Schema.NotMapped]
         public string StatusText => IsAvailable ? "В наличии" : "Выдана";
 
-        
         [Schema.NotMapped]
         public RealyCommand OnEdit => new RealyCommand(_ =>
         {
             IsEditMode = !IsEditMode;
             if (!IsEditMode)
             {
-                var ctx = (MainWindow.Instance.DataContext as VM_Books).Context;
-                if (Id == 0) ctx.Books.Add(this); 
-                else ctx.Entry(this).State = EntityState.Modified;
-                ctx.SaveChanges();
+                if (Context == null)
+                {
+                    MessageBox.Show("Ошибка подключения к базе данных", "Ошибка");
+                    return;
+                }
+
+                try
+                {
+                    if (Id == 0)
+                        Context.Books.Add(this);
+                    else
+                        Context.Entry(this).State = EntityState.Modified;
+                    Context.SaveChanges();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка сохранения: {ex.Message}", "Ошибка");
+                }
             }
         });
 
         [Schema.NotMapped]
         public RealyCommand OnDelete => new RealyCommand(_ =>
         {
-            if (MessageBox.Show("Удалить книгу?", "Подтверждение", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            if (MessageBox.Show("Удалить книгу?", "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             {
-                var vm = MainWindow.Instance.DataContext as VM_Books;
-                vm.Books.Remove(this);
-                vm.Context.Remove(this);
-                vm.Context.SaveChanges();
+                if (ViewModel == null)
+                {
+                    MessageBox.Show("Ошибка: не найден контекст приложения", "Ошибка");
+                    return;
+                }
+
+                if (Context == null)
+                {
+                    MessageBox.Show("Ошибка подключения к базе данных", "Ошибка");
+                    return;
+                }
+
+                try
+                {
+                    ViewModel.Books.Remove(this);
+                    Context.Remove(this);
+                    Context.SaveChanges();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка удаления: {ex.Message}", "Ошибка");
+                    if (!ViewModel.Books.Contains(this))
+                        ViewModel.Books.Add(this);
+                }
             }
         });
+
         [Schema.NotMapped]
         public RealyCommand OnToggleStatus => new RealyCommand(_ =>
         {
             IsAvailable = !IsAvailable;
             if (!IsEditMode)
             {
-                var ctx = (MainWindow.Instance.DataContext as VM_Books).Context;
-                ctx.Entry(this).State = EntityState.Modified;
-                ctx.SaveChanges();
+                if (Context == null)
+                {
+                    MessageBox.Show("Ошибка подключения к базе данных", "Ошибка");
+                    return;
+                }
+
+                try
+                {
+                    Context.Entry(this).State = EntityState.Modified;
+                    Context.SaveChanges();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка изменения статуса: {ex.Message}", "Ошибка");
+                }
             }
         });
     }
