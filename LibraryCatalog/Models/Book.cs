@@ -1,0 +1,133 @@
+﻿using System;
+using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
+using System.Windows;
+using LibraryCatalog.Classes;
+using LibraryCatalog.ViewModels;
+using Microsoft.EntityFrameworkCore;
+using Schema = System.ComponentModel.DataAnnotations.Schema;
+
+namespace LibraryCatalog.Models
+{
+    public class Book : Notification
+    {
+        [Key]
+        public int Id { get; set; }
+        private string title;
+        public string Title
+        {
+            get => title;
+            set
+            {
+                if (string.IsNullOrEmpty(value)) { title = value; OnPropertyChanged(); return; }
+
+                if (!Regex.IsMatch(value, @"^(.{1,100})$"))
+                    MessageBox.Show("Название: от 1 до 100 символов.", "Ошибка ввода");
+                else { title = value; OnPropertyChanged(); }
+            }
+        }
+        private string author;
+        public string Author
+        {
+            get => author;
+            set
+            {
+                if (string.IsNullOrEmpty(value)) { author = value; OnPropertyChanged(); return; }
+                if (!Regex.IsMatch(value, @"^(.{1,50})$"))
+                    MessageBox.Show("Автор: от 1 до 50 символов.", "Ошибка ввода");
+                else { author = value; OnPropertyChanged(); }
+            }
+        }
+        private int year;
+        public int Year
+        {
+            get => year;
+            set
+            {
+                if (value < 1000 || value > DateTime.Now.Year)
+                    MessageBox.Show("Год должен быть в диапазоне 1000 - " + DateTime.Now.Year, "Ошибка ввода");
+                else { year = value; OnPropertyChanged(); }
+            }
+        }
+        private string genre;
+        public string Genre
+        {
+            get => genre;
+            set
+            {
+                if (string.IsNullOrEmpty(value)) { genre = value; OnPropertyChanged(); return; }
+                if (!Regex.IsMatch(value, @"^(.{1,30})$"))
+                    MessageBox.Show("Жанр: от 1 до 30 символов.", "Ошибка ввода");
+                else { genre = value; OnPropertyChanged(); }
+            }
+        }
+        private string description;
+        public string Description
+        {
+            get => description;
+            set
+            {
+                if (string.IsNullOrEmpty(value)) { description = value; OnPropertyChanged(); return; }
+                if (!Regex.IsMatch(value, @"^(.{1,1000})$"))
+                    MessageBox.Show("Описание: не более 1000 символов.", "Ошибка ввода");
+                else { description = value; OnPropertyChanged(); }
+            }
+        }
+        private bool isAvailable;
+        public bool IsAvailable
+        {
+            get => isAvailable;
+            set { isAvailable = value; OnPropertyChanged(); OnPropertyChanged(nameof(StatusText)); }
+        }
+
+        [Schema.NotMapped] private bool isEditMode;
+        [Schema.NotMapped]
+        public bool IsEditMode
+        {
+            get => isEditMode;
+            set { isEditMode = value; OnPropertyChanged(); OnPropertyChanged(nameof(EditButtonText)); }
+        }
+        [Schema.NotMapped]
+        public string EditButtonText => IsEditMode ? "Сохранить" : "Изменить";
+
+        [Schema.NotMapped]
+        public string StatusText => IsAvailable ? "В наличии" : "Выдана";
+
+        
+        [Schema.NotMapped]
+        public RealyCommand OnEdit => new RealyCommand(_ =>
+        {
+            IsEditMode = !IsEditMode;
+            if (!IsEditMode)
+            {
+                var ctx = (MainWindow.Instance.DataContext as VM_Books).Context;
+                if (Id == 0) ctx.Books.Add(this); 
+                else ctx.Entry(this).State = EntityState.Modified;
+                ctx.SaveChanges();
+            }
+        });
+
+        [Schema.NotMapped]
+        public RealyCommand OnDelete => new RealyCommand(_ =>
+        {
+            if (MessageBox.Show("Удалить книгу?", "Подтверждение", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+            {
+                var vm = MainWindow.Instance.DataContext as VM_Books;
+                vm.Books.Remove(this);
+                vm.Context.Remove(this);
+                vm.Context.SaveChanges();
+            }
+        });
+        [Schema.NotMapped]
+        public RealyCommand OnToggleStatus => new RealyCommand(_ =>
+        {
+            IsAvailable = !IsAvailable;
+            if (!IsEditMode)
+            {
+                var ctx = (MainWindow.Instance.DataContext as VM_Books).Context;
+                ctx.Entry(this).State = EntityState.Modified;
+                ctx.SaveChanges();
+            }
+        });
+    }
+}
